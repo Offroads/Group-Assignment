@@ -218,6 +218,7 @@ def cleanup_files():
 		print("test.dataset was removed.")
 	except Exception:
 		pass
+	
 	try:
 		os.remove(os.getcwd() + "\\classifier.trained")
 		print("classifier.trained was removed.")
