@@ -1,9 +1,13 @@
-import cli
+"""
+This file is the main file. It is what you run to start the program.
+Once set, the path to the location of the dataset can be found in main using get_path()
+"""
 import os
 
+import cli
 import data_handler
 
-path = None
+path = ""
 
 
 def set_path():

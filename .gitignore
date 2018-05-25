@@ -109,5 +109,3 @@ ENV/
 .idea/workspace.xml___jb_tmp___
 *.test
 path.config
-classifier.trained
-test.dataset

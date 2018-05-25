@@ -1,11 +1,14 @@
+"""
+This file is responsible for classifying movie reviews
+"""
 import math
 import time
-import data_handler
+
 from stop_words import get_stop_words
 
+import data_handler
+
 stop_words = get_stop_words('english')  #import and declare the stopwords
-#Storing these variables in RAM for better performance
-training_data = None
 pos_words_dict = None
 neg_words_dict = None
 positive_review_count = None
@@ -16,63 +19,68 @@ test_pos_reviews = None
 test_neg_reviews = None
 
 
-def predict_input(text):
+def predict_input(review):
 	"""
 	This function will attempt to predict whether a review that is written by the user is positive or negative.
-	:param text: the input from the user
-	:return: a set with the results.
+	:param review: the input from the user, a string
+	:return: a list with the results
 	"""
-	train()  #this will attempt to load from file
-	list_of_words = data_handler.get_words_from_input(text)
-	pos_prediction = make_class_prediction(list_of_words, pos_words_dict, prob_positive, positive_review_count)
-	neg_prediction = make_class_prediction(list_of_words, neg_words_dict, prob_negative, negative_review_count)
+	review_as_a_list = data_handler.process_words_from_input(review)
+	pos_prediction = make_class_prediction(review_as_a_list, pos_words_dict, prob_positive, positive_review_count)
+	neg_prediction = make_class_prediction(review_as_a_list, neg_words_dict, prob_negative, negative_review_count)
 	predicted_result = decide_outcome(pos_prediction, neg_prediction)
 	if predicted_result == 1:
 		predicted_result = "positive"
 	else:
 		predicted_result = "negative"
 
-	results = []
-	results.append("It is predicted to be: " + predicted_result)
-	results.append("pos_prediction: " + (str(pos_prediction)))
-	results.append("neg_prediction: " + (str(neg_prediction)))
+	results = ["It is predicted to be: " + predicted_result, "pos_prediction: " + (str(pos_prediction)),
+	           "neg_prediction: " + (str(neg_prediction))]
 	return results
 
 
-def make_class_prediction(text, review_wordcount_dict, review_probability, number_of_reviews, use_stop_words = False):
+def make_class_prediction(review, review_wordcount_dict, review_probability, number_of_reviews, use_stop_words = False):
 	"""
 	This will calculate the positive or negative review's value by looking at the frequency of the words in the training
 	data
-	:param text: the review as a list
+	:param review: the review as a list or a dictionary with words as keys and their frequency as values
 	:param review_wordcount_dict: the frequency of the words as a dictionary where the keys are the words
 	:param review_probability: the prior probability
 	:param number_of_reviews: the total number of positive or negative reviews
+	:param use_stop_words: False by default, if True it will ignore words that are stop-words
 	:return: the predicted value
 	"""
 	prediction = 1
-	text_WC_dict = data_handler.count_text(text)
+	if type(review) is list:  # if it is a list it is not counted, should just be the case for user input
+		text_wc_dict = data_handler.count_text(review)
+	else:  # it is already counted and does not need to be counted again
+		text_wc_dict = review
 	divide_with_this = (sum(review_wordcount_dict.values()) + number_of_reviews)
 	# to improve performance, this calculation is done once here and called divide_with_this
-	# summing up all the values for every word makes the prediction very slow.
-	if not use_stop_words:
-		for word in text_WC_dict:
+	# summing up all the values in the dictionary for every word makes the prediction very slow and is not needed.
+	if not use_stop_words:  # not using stop-words
+		for word in text_wc_dict:
 			prediction += math.log(
-				text_WC_dict.get(word, 0) * ((review_wordcount_dict.get(word, 0) + 1) / divide_with_this))
-	else:
+				text_wc_dict.get(word, 0) * ((review_wordcount_dict.get(word, 0) + 1) / divide_with_this))
 
-		for word in text_WC_dict:
+	else:  # using stopwords - skipping the words that are stop-words
+		for word in text_wc_dict:
 			if word not in stop_words:
 				prediction += math.log(
-					text_WC_dict.get(word, 0) * ((review_wordcount_dict.get(word, 0) + 1) / divide_with_this))
-	return prediction * review_probability
+					text_wc_dict.get(word, 0) * ((review_wordcount_dict.get(word, 0) + 1) / divide_with_this))
+	return prediction * review_probability  #multiply the probability with the prior probability
 
 
-def classify(text, use_stop_words = False):
-	# P(xi|H) the likelyhood or the probability of predictor (a word) given hypothesis (positive review), adding 1 to
-	# smooth the value so we dont multiply the prediction by 0 if the word didn't exist in the training data
-	negative_prediction = make_class_prediction(text, neg_words_dict, prob_negative, negative_review_count,
+def classify(review, use_stop_words = False):
+	"""
+	This function will classify a review
+	:param review: the review
+	:param use_stop_words: Optional, False by default - if true stop-words will be used
+	:return: 1 if positive, -1 if negative
+	"""
+	negative_prediction = make_class_prediction(review, neg_words_dict, prob_negative, negative_review_count,
 	                                            use_stop_words = use_stop_words)
-	positive_prediction = make_class_prediction(text, pos_words_dict, prob_positive, positive_review_count,
+	positive_prediction = make_class_prediction(review, pos_words_dict, prob_positive, positive_review_count,
 	                                            use_stop_words = use_stop_words)
 
 	return decide_outcome(positive_prediction, negative_prediction)
@@ -91,53 +99,80 @@ def decide_outcome(positive_prediction, negative_prediction):
 		return 1
 
 
-def train():
+def train(use_testing_data = False):
 	"""
 	This will attempt to load the classifier and declare the variables,
-	if it is unable to do so it will load the data and save it as classifier.trained
-	:return:
+	if it is unable to do so it will process the data and save it as classifier.trained
+	:param use_testing_data: Optional, False by default - if true testing data will be used
+	:return: a dictionary with the following:
+		"pos_words_dict":pos_words_dict,
+		"neg_words_dict":neg_words_dict,
+		"positive_review_count":positive_review_count,
+		"negative_review_count":negative_review_count,
+		"prob_positive":prob_positive,
+		"prob_negative":prob_negative
 	"""
-	global pos_words_dict, neg_words_dict, positive_review_count, negative_review_count, prob_positive, prob_negative, test_pos_reviews, test_neg_reviews
+	global pos_words_dict, neg_words_dict, positive_review_count, negative_review_count,\
+		prob_positive, prob_negative, test_pos_reviews, test_neg_reviews
 	start_time = time.time()
-	if pos_words_dict == None:  # check if a variable is missing, if it is they all are and has to be added.
-
+	if not use_testing_data:
 		try:
 			data = data_handler.load_object("classifier.trained")
-
 			pos_words_dict = data["pos_words_dict"]
 			neg_words_dict = data["neg_words_dict"]
 			positive_review_count = data["positive_review_count"]
 			negative_review_count = data["negative_review_count"]
 			prob_positive = data["prob_positive"]
 			prob_negative = data["prob_negative"]
-		except Exception as e:
+		except Exception:
 			print(
-				"Couldn't load test data from the classifier.trained file. Processing the training data now, this may take a while...")
+				"Couldn't load test data from the classifier.trained file."
+				" Processing the training data now, this may take a while...")
 			data = process_training_data()
 			data_handler.save_object(data, "classifier.trained")
 
-	else:
-		pass
+	else:  # use testing data to train
+		try:
+			data = data_handler.load_object("classifier_from_testing_data.trained")
+			pos_words_dict = data["pos_words_dict"]
+			neg_words_dict = data["neg_words_dict"]
+			positive_review_count = data["positive_review_count"]
+			negative_review_count = data["negative_review_count"]
+			prob_positive = data["prob_positive"]
+			prob_negative = data["prob_negative"]
+		except Exception:
+			print(
+				"Couldn't load test data from the classifier_from_testing_data.trained file. "
+				"Processing the training data now, this may take a while...")
+			data = process_training_data(use_testing_data = use_testing_data)
+			data_handler.save_object(data, "classifier_from_testing_data.trained")
+
 	final_time = time.time() - start_time
-	print("It took: "f'{final_time:.2f}'" seconds to load the classifier\n")  # TODO REMOVE BEFORE SUBMITTING??
+	print("It took: "f'{final_time:.2f}'" seconds to load the classifier\n")
 	return {
+		"pos_words_dict": pos_words_dict,
+		"neg_words_dict": neg_words_dict,
+		"positive_review_count": positive_review_count,
+		"negative_review_count": negative_review_count,
+		"prob_positive": prob_positive,
+		"prob_negative": prob_negative}
+
+
+def process_training_data(use_testing_data = False):
+	"""
+	This will process the training data and prepare it for the classifier
+	:param use_testing_data: Optional, False by default - if true testing data will be used
+	:return: a dictionary with the following:
 		"pos_words_dict":pos_words_dict,
 		"neg_words_dict":neg_words_dict,
 		"positive_review_count":positive_review_count,
 		"negative_review_count":negative_review_count,
 		"prob_positive":prob_positive,
-		"prob_negative":prob_negative}
-
-
-def process_training_data():
-	"""
-	This will process the training data and prepare it for the classifier
-	:return: pos_words_dict, neg_words_dict, positive_review_count,
-			negative_review_count, prob_positive, prob_negative
+		"prob_negative":prob_negative
 	"""
 	global pos_words_dict, neg_words_dict, positive_review_count, negative_review_count, prob_positive, prob_negative
-	training_data = data_handler.get_training_words()  # This will have training data ready, prepared for counting etc.
 
+	training_data = data_handler.get_training_data(use_testing_data = use_testing_data)
 	pos_words_dict = data_handler.count_text(training_data[0])
 	neg_words_dict = data_handler.count_text(training_data[1])
 	positive_review_count = training_data[2]
@@ -147,23 +182,23 @@ def process_training_data():
 	print("P(y) or the prior positive probability is: ", prob_positive)
 
 	return {
-		"pos_words_dict":pos_words_dict,
-		"neg_words_dict":neg_words_dict,
-		"positive_review_count":positive_review_count,
-		"negative_review_count":negative_review_count,
-		"prob_positive":prob_positive,
-		"prob_negative":prob_negative}
+		"pos_words_dict": pos_words_dict,
+		"neg_words_dict": neg_words_dict,
+		"positive_review_count": positive_review_count,
+		"negative_review_count": negative_review_count,
+		"prob_positive": prob_positive,
+		"prob_negative": prob_negative}
 
 
-def load_test_dataset():
+def load_test_dataset(use_training_data = False):
 	"""
 	This will load the test dataset from test.data if possible, else it will process it and create that file.
-	:return:
+	:param use_training_data: Optional, False by default - if true training data will be used
 	"""
-	#test reviews
+	start_time = time.time()
 	global test_pos_reviews, test_neg_reviews
-	if test_pos_reviews == None or test_neg_reviews == None:
 
+	if not use_training_data:
 		try:
 			test_data = data_handler.load_object("test.dataset")
 			test_pos_reviews = test_data["pos_reviews"]
@@ -171,25 +206,40 @@ def load_test_dataset():
 
 		except Exception:
 			print(
-				"Couldn't load test data from the test.dataset file. Processing the test data now, this may take a while...")
+				"Couldn't load test data from the test.dataset file. Processing the test data now, this may take a while.")
 			test_data = data_handler.get_test_data()
 			test_pos_reviews = test_data["pos_reviews"]
 			test_neg_reviews = test_data["neg_reviews"]
 			data_handler.save_object(test_data, "test.dataset")
+	else:
+		try:
+			test_data = data_handler.load_object("training.dataset")
+			test_pos_reviews = test_data["pos_reviews"]
+			test_neg_reviews = test_data["neg_reviews"]
 
-	return test_pos_reviews, test_neg_reviews
+		except Exception:
+			print(
+				"Couldn't load test data from the training.dataset file. Processing the test data now, this may take a while.")
+			test_data = data_handler.get_test_data(use_training_data = use_training_data)
+			test_pos_reviews = test_data["pos_reviews"]
+			test_neg_reviews = test_data["neg_reviews"]
+			data_handler.save_object(test_data, "training.dataset")
+	final_time = time.time() - start_time
+	print("It took: "f'{final_time:.2f}'" seconds to load the test dataset\n")
 
 
-def predict_test_reviews(use_stop_words = False):
+def predict_reviews(use_stop_words = False, classify_training_data = False):
 	"""
 	Predicts all the test reviews
+	:param use_stop_words: False by default, if True - stopwords are used
+	:param classify_training_data: False by default, if True - the training data will be classified
 	:return: a dict with the results, keys are:
 	predicted_positive
 	predicted_negative
 	correct_predictions
 	incorrect_predictions
 	"""
-	load_test_dataset()
+	load_test_dataset(use_training_data = classify_training_data)
 	predicted_positive = 0
 	predicted_negative = 0
 	correct_predictions = 0
@@ -205,8 +255,8 @@ def predict_test_reviews(use_stop_words = False):
 
 	while pos_test_reviews.__len__() > counter:
 		current_review = pos_test_reviews[counter]
-		classificiation = classify(current_review, use_stop_words = use_stop_words)
-		if classificiation == -1:
+		classification = classify(current_review, use_stop_words = use_stop_words)
+		if classification == -1:
 			predicted_negative += 1
 			incorrect_predictions += 1
 		else:
@@ -217,8 +267,8 @@ def predict_test_reviews(use_stop_words = False):
 
 	while neg_test_reviews.__len__() > counter:
 		current_review = neg_test_reviews[counter]
-		classificiation = classify(current_review, use_stop_words = use_stop_words)
-		if classificiation == -1:
+		classification = classify(current_review, use_stop_words = use_stop_words)
+		if classification == -1:
 			predicted_negative += 1
 			correct_predictions += 1
 		else:
@@ -226,9 +276,6 @@ def predict_test_reviews(use_stop_words = False):
 			incorrect_predictions += 1
 		counter += 1
 
-	results = {}
-	results["predicted_positive"] = predicted_positive
-	results["predicted_negative"] = predicted_negative
-	results["correct_predictions"] = correct_predictions
-	results["incorrect_predictions"] = incorrect_predictions
+	results = {"predicted_positive": predicted_positive, "predicted_negative": predicted_negative,
+	           "correct_predictions": correct_predictions, "incorrect_predictions": incorrect_predictions}
 	return results
