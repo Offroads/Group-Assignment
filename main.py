@@ -60,8 +60,7 @@ def get_path():
 	This returns the path to the dataset directory
 	:return: the path
 	"""
-	dir_path = os.path.dirname(os.path.realpath(__file__))
-	os.chdir(dir_path)  # changes the current working directory to pathname
+	data_handler.switch_to_file_dir()  # changes the current working directory to pathname
 	path = data_handler.load_object("path.config")
 	return path
 

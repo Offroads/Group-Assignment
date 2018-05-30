@@ -12,6 +12,7 @@ import main
 def get_test_data(use_training_data = False):
 	"""
 	Test data is gathered, processed and put in dictionaries
+	Progress is printed
 	:return: dict with positive and negative reviews
 	Keys:
 	pos_reviews - the positive reviews
@@ -27,15 +28,17 @@ def get_test_data(use_training_data = False):
 	i = 0
 	pos_reviews = {}
 	neg_reviews = {}
-	while pos_train_files.__len__() is not 0:  # while list is not empty get reviews and put them into a dict
-		review = get_words(path = pos_train_files.pop())
-		pos_reviews[i] = review  # key is just a number, use __len__() on the dict to find number of reviews later
+	for file in pos_train_files:
+		pos_reviews[i] = get_words(path = file)
 		i += 1
+		print(f"Loading negative test reviews... {(i)/len(pos_train_files):.0%}", end = "\r")
 	i = 0
-	while neg_train_files.__len__() is not 0:
-		review = get_words(path = neg_train_files.pop())
-		neg_reviews[i] = review
+	print()
+	for file in neg_train_files:
+		neg_reviews[i] = get_words(path = file)
 		i += 1
+		print(f"Loading positive test reviews... {(i)/len(pos_train_files):.0%}", end = "\r")
+	print()
 
 	test_data = {"pos_reviews": pos_reviews, "neg_reviews": neg_reviews}
 	return test_data
@@ -78,10 +81,15 @@ def save_object(obj, filename):
 	:param obj: the object you want to save
 	:param filename: the name you want to give to the file that is created
 	"""
-	dir_path = os.path.dirname(os.path.realpath(__file__))  # get the path to python file
-	os.chdir(dir_path)
+	switch_to_file_dir()
 	with open(filename, 'wb') as output:  # Overwrites any existing file.
 		pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
+
+
+def switch_to_file_dir():
+	dir_path = os.path.dirname(os.path.realpath(__file__))  # get the path to python file
+	dir_path = dir_path + "\\files\\"
+	os.chdir(dir_path)
 
 
 def load_object(filename):
@@ -93,6 +101,7 @@ def load_object(filename):
 	:param filename: the filename of the object
 	:return: the object
 	"""
+	switch_to_file_dir()
 	with open(filename, 'rb') as file:
 		file = pickle.load(file)
 	return file
@@ -210,29 +219,28 @@ def cleanup_files():
 	"""
 	This function will remove files that were created by the program
 	"""
-	dir_path = os.path.dirname(os.path.realpath(__file__))  # get the path to python file
-	os.chdir(dir_path)
+	switch_to_file_dir()
 
 	try:
-		os.remove(os.getcwd() + "\\test.dataset")
+		os.remove("test.dataset")
 		print("test.dataset was removed.")
 	except Exception:
 		pass
 
 	try:
-		os.remove(os.getcwd() + "\\classifier.trained")
+		os.remove("classifier.trained")
 		print("classifier.trained was removed.")
 	except Exception:
 		pass
 
 	try:
-		os.remove(os.getcwd() + "\\training.dataset")
+		os.remove("training.dataset")
 		print("training.dataset was removed.")
 	except Exception:
 		pass
 
 	try:
-		os.remove(os.getcwd() + "\\classifier_from_testing_data.trained")
+		os.remove("classifier_from_testing_data.trained")
 		print("classifier_from_testing_data.trained was removed.")
 	except Exception:
 		pass

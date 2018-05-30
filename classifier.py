@@ -231,6 +231,7 @@ def load_test_dataset(use_training_data = False):
 def predict_reviews(use_stop_words = False, classify_training_data = False):
 	"""
 	Predicts all the test reviews
+	Progress is printed
 	:param use_stop_words: False by default, if True - stopwords are used
 	:param classify_training_data: False by default, if True - the training data will be classified
 	:return: a dict with the results, keys are:
@@ -263,8 +264,9 @@ def predict_reviews(use_stop_words = False, classify_training_data = False):
 			predicted_positive += 1
 			correct_predictions += 1
 		counter += 1
+		print(f"Classifying positive reviews... {(counter)/len(pos_test_reviews):.0%}", end = "\r")
 	counter = 0
-
+	print()
 	while neg_test_reviews.__len__() > counter:
 		current_review = neg_test_reviews[counter]
 		classification = classify(current_review, use_stop_words = use_stop_words)
@@ -275,7 +277,8 @@ def predict_reviews(use_stop_words = False, classify_training_data = False):
 			predicted_positive += 1
 			incorrect_predictions += 1
 		counter += 1
-
+		print(f"Classifying negative reviews... {(counter)/len(neg_test_reviews):.0%}", end = "\r")
+	print()
 	results = {"predicted_positive": predicted_positive, "predicted_negative": predicted_negative,
 	           "correct_predictions": correct_predictions, "incorrect_predictions": incorrect_predictions}
 	return results
